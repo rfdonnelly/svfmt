@@ -1,5 +1,9 @@
 fn main() {
-    let language = "verilog";
+    build_language("verilog");
+    build_language("c");
+}
+
+fn build_language(language: &str) {
     let package = format!("tree-sitter-{}", language);
     let source_directory = format!("{}/src", package);
     let source_file = format!("{}/parser.c", source_directory);

@@ -1,22 +1,50 @@
+use std::env;
 use std::io;
-use tree_sitter::{Language, Parser, Node};
+use std::io::Read;
+use std::path::Path;
+use std::ffi::OsStr;
+use std::fs::File;
+use tree_sitter::{Language, Parser, Node, TreeCursor};
 
 extern "C" {
     fn tree_sitter_verilog() -> Language;
+    fn tree_sitter_c() -> Language;
 }
 
 fn main() {
-    let language = unsafe { tree_sitter_verilog() };
+    let filename = env::args().skip(1).next().unwrap();
+    let filename = Path::new(&filename);
+    let extension = filename
+        .extension()
+        .and_then(OsStr::to_str)
+        .unwrap();
+
+    let language =
+        match extension {
+            "c" | "h" => unsafe { tree_sitter_c() },
+            _ => unsafe {tree_sitter_verilog() },
+        };
+
     let mut parser = Parser::new();
     parser.set_language(language).unwrap();
+    let source_code = load_file(filename).unwrap();
+    let tree = parser.parse(&source_code, None).unwrap();
 
-    let source_code = "module mymodule(); endmodule";
-    let tree = parser.parse(source_code, None).unwrap();
-
-    let formatter = Formatter::new(source_code);
-    formatter.write_debug_node(&mut std::io::stdout(), 0, tree.root_node());
+    println!("{}", tree.root_node().to_sexp());
     println!();
-    formatter.write_node(&mut std::io::stdout(), tree.root_node());
+    let formatter = Formatter::new(&source_code);
+    formatter.debug_walk(&mut std::io::stdout(), 0, &mut tree.walk());
+    println!();
+    formatter.format_node(&mut std::io::stdout(), tree.root_node());
+}
+
+fn load_file(path: &Path) -> io::Result<String> {
+    let mut file = File::open(path)?;
+
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+
+    Ok(content)
 }
 
 struct Formatter<'a> {
@@ -30,52 +58,288 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    fn write_debug_node<T>(&self, f: &mut T, indent: usize, node: Node<'a>)
+    fn debug_walk<T>(&self, f: &mut T, mut indent: usize, cursor: &mut TreeCursor<'a>)
     where
         T: io::Write,
     {
-        writeln!(f, "{:indent$}{}:{}: {}", "", node.kind(), node.kind_id(), node.utf8_text(self.source).unwrap(), indent = indent).unwrap();
+        loop {
+            let node = cursor.node();
+            write!(f, "{:indent$}", "", indent = indent).unwrap();
+            let first_line = self.text(node).lines().next().unwrap_or("MISSING");
+            writeln!(f, "{}:{}: {}", node.kind(), cursor.field_name().unwrap_or("null"), first_line).unwrap();
 
-        for child in node.children() {
-            self.write_debug_node(f, indent + 2, child);
+            if cursor.goto_first_child() {
+                indent += 4;
+            } else {
+                if !cursor.goto_next_sibling() {
+                    loop {
+                        if !cursor.goto_parent() {
+                            return;
+                        }
+
+                        indent -= 4;
+
+                        if cursor.goto_next_sibling() {
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 
-    fn write_node<T>(&self, f:&mut T, node: Node<'a>)
+    fn text(&self, node: Node<'a>) -> &'a str {
+        node.utf8_text(self.source).unwrap()
+    }
+
+    fn format_with_newline<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        writeln!(f, "{}", self.text(node)).unwrap()
+    }
+
+    fn format_tree<T>(&self, f: &mut T, node: Node<'a>, sep: &str, suffix: &str)
+    where
+        T: io::Write,
+    {
+        let nodes: Vec<&'a str> =
+            Terminals::new(node)
+            .map(|node| self.text(node))
+            .collect();
+
+        write!(f, "{}{}", nodes.join(sep), suffix).unwrap();
+    }
+
+    fn format_children<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        for child in node.children() {
+            self.format_node(f, child);
+        }
+    }
+
+    fn format_node<T>(&self, f: &mut T, node: Node<'a>)
     where
         T: io::Write,
     {
         match node.kind() {
-            "source_file" => self.write_children(f, node),
-            "module_declaration" => self.write_module(f, node),
-            _ => {
-                self.write_node_generic(f, node);
-                self.write_children(f, node);
+            "function_declaration" => self.format_function_declaration(f, node),
+            "expression" => self.format_expression(f, node),
+            "jump_statement" => self.format_jump_statement(f, node),
+            "integer_atom_type" => write!(f, "{} ", self.text(node)).unwrap(),
+            "simple_identifier" => write!(f, "{}", self.text(node)).unwrap(),
+            "list_of_arguments_parent" => self.format_list_of_arguments(f, node),
+            _=> self.format_children(f, node),
+        }
+    }
+
+    fn format_list_of_arguments<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        write!(f, "(").unwrap();
+        let children = node
+            .children()
+            .filter(|node| node.is_named())
+            .identify_last();
+
+        for (last, child) in children {
+            self.format_node(f, child);
+
+            if !last {
+                write!(f, ", ").unwrap();
+            }
+        }
+        write!(f, ")").unwrap();
+    }
+
+    fn format_expression<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        if let Some(operator) = node.child_by_field_name("operator") {
+            let left = node.child_by_field_name("left").unwrap();
+            let right = node.child_by_field_name("right").unwrap();
+
+            self.format_node(f, left);
+            write!(f, " {} ", self.text(operator)).unwrap();
+            self.format_node(f, right);
+        } else {
+            assert_eq!(node.child_count(), 1);
+
+            self.format_node(f, node.child(0).unwrap());
+        }
+    }
+
+    fn format_jump_statement<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        let jump_type = node.child(0).unwrap();
+
+        write!(f, "{}", self.text(jump_type)).unwrap();
+        if node.child_count() == 3 {
+            write!(f, " ").unwrap();
+            let expression = node.child(1).unwrap();
+            self.format_expression(f, expression);
+        }
+    }
+
+    fn format_function_declaration<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        let indent = 0;
+
+        assert_eq!(node.child_count(), 2);
+
+        let keyword = node.child(0).unwrap();
+        let body = node.child(1).unwrap();
+
+        assert_eq!(keyword.kind(), "function");
+        assert_eq!(body.kind(), "function_body_declaration");
+
+        write!(f, "function ").unwrap();
+
+        for child in body.children() {
+            match child.kind() {
+                "function_data_type_or_implicit" => self.format_tree(f, child, " ", " "),
+                "function_identifier" => self.format_tree(f, child, " ", ""),
+                "tf_port_list" => self.format_tf_port_list(f, child),
+                "function_statement_or_null" => self.format_function_statement_or_null(f, indent + 4, child),
+                "comment" => self.format_with_newline(f, child),
+                _ => {},
             }
         }
 
+        writeln!(f, "endfunction").unwrap();
+        writeln!(f).unwrap();
     }
 
-    fn write_children<T>(&self, f:&mut T, node: Node<'a>)
+    fn write_spaces<T>(&self, f: &mut T, spaces: usize)
     where
         T: io::Write,
     {
-        for child in node.children() {
-            self.write_node(f, child);
+        write!(f, "{:1$}", "", spaces).unwrap();
+    }
+
+    fn format_tf_port_list<T>(&self, f: &mut T, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        writeln!(f, "(").unwrap();
+
+        let children = node
+            .children()
+            .filter(|child| child.is_named())
+            .identify_last();
+
+        for (last, child) in children {
+            self.write_spaces(f, 4);
+            self.format_node(f, child);
+
+            if !last {
+                writeln!(f, ",").unwrap();
+            }
+        }
+
+        writeln!(f, "\n);").unwrap();
+    }
+
+    fn format_function_statement_or_null<T>(&self, f: &mut T, indent: usize, node: Node<'a>)
+    where
+        T: io::Write,
+    {
+        assert_eq!(node.child_count(), 1);
+
+        self.write_spaces(f, indent);
+        self.format_children(f, node);
+        writeln!(f, ";").unwrap();
+    }
+}
+
+/// Iterator struct for iterating over all terminal nodes
+struct Terminals<'a> {
+    index: usize,
+    terminals: Vec<Node<'a>>,
+}
+
+impl<'a> Terminals<'a> {
+    fn new(node: Node<'a>) -> Self {
+        let mut terminals = Vec::new();
+
+        Self::collect_terminals(node, &mut terminals);
+
+        Terminals {
+            index: 0,
+            terminals,
         }
     }
 
-    fn write_module<T>(&self, f:&mut T, node: Node<'a>)
-    where
-        T: io::Write,
-    {
-        writeln!(f, "{} ", node.utf8_text(self.source).unwrap()).unwrap();
+    fn collect_terminals(node: Node<'a>, terminals: &mut Vec<Node<'a>>) {
+        for child in node.children() {
+            if child.child_count() == 0 {
+                terminals.push(child);
+            }
+            Self::collect_terminals(child, terminals);
+        }
     }
+}
 
-    fn write_node_generic<T>(&self, f:&mut T, node: Node<'a>)
-    where
-        T: io::Write,
-    {
-        writeln!(f, "{} ", node.utf8_text(self.source).unwrap()).unwrap();
+impl<'a> Iterator for Terminals<'a> {
+    type Item = Node<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item =
+            if self.index == self.terminals.len() {
+                None
+            } else {
+                Some(self.terminals[self.index])
+            };
+
+        self.index += 1;
+
+        item
+    }
+}
+
+// From: https://users.rust-lang.org/t/iterator-need-to-identify-the-last-element/8836
+pub trait IdentifyLast: Iterator + Sized {
+    fn identify_last(self) -> Iter<Self>;
+}
+
+impl<T> IdentifyLast for T where T: Iterator {
+    fn identify_last(mut self) -> Iter<Self> {
+        let e = self.next();
+        Iter {
+            iter: self,
+            buffer: e,
+        }
+    }
+}
+
+pub struct Iter<T> where T: Iterator {
+    iter: T,
+    buffer: Option<T::Item>,
+}
+
+impl<T> Iterator for Iter<T> where T: Iterator {
+    type Item = (bool, T::Item);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.buffer.take() {
+            None => None,
+            Some(e) => {
+                match self.iter.next() {
+                    None => Some((true, e)),
+                    Some(f) => {
+                        self.buffer = Some(f);
+                        Some((false, e))
+                    },
+                }
+            },
+        }
     }
 }
