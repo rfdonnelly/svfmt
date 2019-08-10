@@ -8,7 +8,7 @@ fn build_language(language: &str) {
     let source_directory = format!("{}/src", package);
     let source_file = format!("{}/parser.c", source_directory);
 
-    println!("rerun-if-changed={}", source_file);
+    println!("cargo:rerun-if-changed={}", source_file);
 
     cc::Build::new()
         .file(source_file)
