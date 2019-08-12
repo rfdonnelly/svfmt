@@ -19,12 +19,18 @@ pub fn format<'a, T>(f: &mut T, source: &'a str, tree: Tree)
 where
     T: io::Write,
 {
+    let formatter = Formatter::new(&source);
+    formatter.format_node(f, tree.root_node());
+}
+
+pub fn debug<'a, T>(f: &mut T, source: &'a str, tree: Tree)
+where
+    T: io::Write,
+{
     println!("{}", tree.root_node().to_sexp());
     println!();
     let formatter = Formatter::new(&source);
     formatter.debug_walk(f, 0, &mut tree.walk());
-    println!();
-    formatter.format_node(f, tree.root_node());
 }
 
 struct Formatter<'a> {

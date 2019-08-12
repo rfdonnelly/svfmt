@@ -22,6 +22,7 @@ fn main() {
 
     let source = load_file(filename).unwrap();
     let tree = parse(language, &source);
+    svfmt::debug(&mut std::io::stdout(), &source, tree);
     format(&mut std::io::stdout(), &source, tree);
 }
 
