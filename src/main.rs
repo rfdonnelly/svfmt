@@ -99,7 +99,7 @@ impl<'a> Formatter<'a> {
         writeln!(f, "{}", self.text(node)).unwrap()
     }
 
-    fn format_tree<T>(&self, f: &mut T, node: Node<'a>, sep: &str, suffix: &str)
+    fn format_terminals<T>(&self, f: &mut T, node: Node<'a>, sep: &str, suffix: &str)
     where
         T: io::Write,
     {
@@ -205,8 +205,8 @@ impl<'a> Formatter<'a> {
 
         for child in body.children() {
             match child.kind() {
-                "function_data_type_or_implicit" => self.format_tree(f, child, " ", " "),
-                "function_identifier" => self.format_tree(f, child, " ", ""),
+                "function_data_type_or_implicit" => self.format_terminals(f, child, " ", " "),
+                "function_identifier" => self.format_terminals(f, child, " ", ""),
                 "tf_port_list" => self.format_tf_port_list(f, child),
                 "function_statement_or_null" => self.format_function_statement_or_null(f, indent + 4, child),
                 "comment" => self.format_with_newline(f, child),
