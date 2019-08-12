@@ -12,3 +12,18 @@ The resulting tree is walked and converted to a string representation.
 The result is formatted Verilog/SystemVerilog code.
 
 [Tree-sitter]: http://tree-sitter.github.io/tree-sitter
+
+## Development Dependencies
+
+* Rust
+* Node.js
+
+## Build
+
+```sh
+git clone --recursive git@github.com:rfdonnelly/svfmt.git
+cd svfmt
+(cd vendor/tree-sitter-verilog; npm install)
+cargo test
+cargo run -- fixtures/expressions.sv
+```
