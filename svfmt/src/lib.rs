@@ -15,7 +15,7 @@ pub fn parse<'a>(language: Language, source: &'a str) -> Tree {
     parser.parse(&source, None).unwrap()
 }
 
-pub fn format<'a, T>(f: &mut T, source: &'a str, tree: Tree)
+pub fn format<'a, T>(f: &mut T, source: &'a str, tree: &Tree)
 where
     T: io::Write,
 {
@@ -23,7 +23,7 @@ where
     formatter.format_node(f, tree.root_node());
 }
 
-pub fn debug<'a, T>(f: &mut T, source: &'a str, tree: Tree)
+pub fn debug<'a, T>(f: &mut T, source: &'a str, tree: &Tree)
 where
     T: io::Write,
 {
