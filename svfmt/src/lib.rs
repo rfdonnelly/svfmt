@@ -143,9 +143,11 @@ impl<'a> Formatter<'a> {
     where
         T: io::Write,
     {
-        if let Some(operator) = node.child_by_field_name("operator") {
-            let left = node.child_by_field_name("left").unwrap();
-            let right = node.child_by_field_name("right").unwrap();
+        if node.child_count() == 3 {
+            // Binary expression
+            let left = node.child(0).unwrap();
+            let operator = node.child(1).unwrap();
+            let right = node.child(2).unwrap();
 
             self.format_node(f, left);
             write!(f, " {} ", self.text(operator)).unwrap();
