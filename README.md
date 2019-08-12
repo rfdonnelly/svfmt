@@ -1,4 +1,4 @@
-# svfmt
+# svfmt ![Stability: Experimental](http://badges.github.io/stability-badges/dist/experimental.svg)
 
 A tool for formatting Verilog/SystemVerilog code.
 
