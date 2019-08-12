@@ -1,7 +1,11 @@
-use tree_sitter::{Language, Parser, Node, Tree, TreeCursor};
+use tree_sitter::{Language, Node, Parser, Tree, TreeCursor};
 
-extern "C" { pub fn tree_sitter_c() -> Language; }
-extern "C" { pub fn tree_sitter_verilog() -> Language; }
+extern "C" {
+    pub fn tree_sitter_c() -> Language;
+}
+extern "C" {
+    pub fn tree_sitter_verilog() -> Language;
+}
 
 use std::io;
 
@@ -42,7 +46,14 @@ impl<'a> Formatter<'a> {
             let node = cursor.node();
             write!(f, "{:indent$}", "", indent = indent).unwrap();
             let first_line = self.text(node).lines().next().unwrap_or("MISSING");
-            writeln!(f, "{}:{}: {}", node.kind(), cursor.field_name().unwrap_or("null"), first_line).unwrap();
+            writeln!(
+                f,
+                "{}:{}: {}",
+                node.kind(),
+                cursor.field_name().unwrap_or("null"),
+                first_line
+            )
+            .unwrap();
 
             if cursor.goto_first_child() {
                 indent += 4;
@@ -79,10 +90,7 @@ impl<'a> Formatter<'a> {
     where
         T: io::Write,
     {
-        let nodes: Vec<&'a str> =
-            Terminals::new(node)
-            .map(|node| self.text(node))
-            .collect();
+        let nodes: Vec<&'a str> = Terminals::new(node).map(|node| self.text(node)).collect();
 
         write!(f, "{}{}", nodes.join(sep), suffix).unwrap();
     }
@@ -107,7 +115,7 @@ impl<'a> Formatter<'a> {
             "integer_atom_type" => write!(f, "{} ", self.text(node)).unwrap(),
             "simple_identifier" => write!(f, "{}", self.text(node)).unwrap(),
             "list_of_arguments_parent" => self.format_list_of_arguments(f, node),
-            _=> self.format_children(f, node),
+            _ => self.format_children(f, node),
         }
     }
 
@@ -184,9 +192,11 @@ impl<'a> Formatter<'a> {
                 "function_data_type_or_implicit" => self.format_terminals(f, child, " ", " "),
                 "function_identifier" => self.format_terminals(f, child, " ", ""),
                 "tf_port_list" => self.format_tf_port_list(f, child),
-                "function_statement_or_null" => self.format_function_statement_or_null(f, indent + 4, child),
+                "function_statement_or_null" => {
+                    self.format_function_statement_or_null(f, indent + 4, child)
+                }
                 "comment" => self.format_with_newline(f, child),
-                _ => {},
+                _ => {}
             }
         }
 
@@ -268,12 +278,11 @@ impl<'a> Iterator for Terminals<'a> {
     type Item = Node<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let item =
-            if self.index == self.terminals.len() {
-                None
-            } else {
-                Some(self.terminals[self.index])
-            };
+        let item = if self.index == self.terminals.len() {
+            None
+        } else {
+            Some(self.terminals[self.index])
+        };
 
         self.index += 1;
 
@@ -286,7 +295,10 @@ pub trait IdentifyLast: Iterator + Sized {
     fn identify_last(self) -> Iter<Self>;
 }
 
-impl<T> IdentifyLast for T where T: Iterator {
+impl<T> IdentifyLast for T
+where
+    T: Iterator,
+{
     fn identify_last(mut self) -> Iter<Self> {
         let e = self.next();
         Iter {
@@ -296,24 +308,28 @@ impl<T> IdentifyLast for T where T: Iterator {
     }
 }
 
-pub struct Iter<T> where T: Iterator {
+pub struct Iter<T>
+where
+    T: Iterator,
+{
     iter: T,
     buffer: Option<T::Item>,
 }
 
-impl<T> Iterator for Iter<T> where T: Iterator {
+impl<T> Iterator for Iter<T>
+where
+    T: Iterator,
+{
     type Item = (bool, T::Item);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.buffer.take() {
             None => None,
-            Some(e) => {
-                match self.iter.next() {
-                    None => Some((true, e)),
-                    Some(f) => {
-                        self.buffer = Some(f);
-                        Some((false, e))
-                    },
+            Some(e) => match self.iter.next() {
+                None => Some((true, e)),
+                Some(f) => {
+                    self.buffer = Some(f);
+                    Some((false, e))
                 }
             },
         }
