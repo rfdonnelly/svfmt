@@ -5,7 +5,8 @@ fn main() {
 
 fn build_language(language: &str) {
     let package = format!("tree-sitter-{}", language);
-    let source_directory = format!("{}/src", package);
+    let package_path = format!("../{}", package);
+    let source_directory = format!("{}/src", package_path);
     let source_file = format!("{}/parser.c", source_directory);
 
     println!("cargo:rerun-if-changed={}", source_file);

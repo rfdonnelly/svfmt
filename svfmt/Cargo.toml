@@ -1,18 +1,11 @@
 [package]
-name = "svfmt-cli"
+name = "svfmt"
 version = "0.1.0"
 authors = ["Rob Donnelly <rfdonnelly@gmail.com>"]
 edition = "2018"
 
-[workspace]
-members = [
-    "svfmt",
-]
-
-[[bin]]
-name = "svfmt"
-path = "src/main.rs"
+[build-dependencies]
+cc = "1.0"
 
 [dependencies]
 tree-sitter = "0.3"
-svfmt = { path = "svfmt" }
