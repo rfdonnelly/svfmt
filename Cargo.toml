@@ -14,5 +14,4 @@ name = "svfmt"
 path = "src/main.rs"
 
 [dependencies]
-tree-sitter = "0.3"
 svfmt = { path = "svfmt" }

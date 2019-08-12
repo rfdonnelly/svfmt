@@ -1,5 +1,8 @@
 use tree_sitter::{Language, Parser, Node, Tree, TreeCursor};
 
+extern "C" { pub fn tree_sitter_c() -> Language; }
+extern "C" { pub fn tree_sitter_verilog() -> Language; }
+
 use std::io;
 
 pub fn parse<'a>(language: Language, source: &'a str) -> Tree {

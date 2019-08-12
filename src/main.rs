@@ -4,11 +4,7 @@ use std::io::Read;
 use std::path::Path;
 use std::ffi::OsStr;
 use std::fs::File;
-use tree_sitter::Language;
-use svfmt::{parse, format};
-
-extern "C" { fn tree_sitter_c() -> Language; }
-extern "C" { fn tree_sitter_verilog() -> Language; }
+use svfmt::{self, parse, format};
 
 fn main() {
     let filename = env::args().skip(1).next().unwrap();
@@ -20,8 +16,8 @@ fn main() {
 
     let language =
         match extension {
-            "c" | "h" => unsafe { tree_sitter_c() },
-            _ => unsafe {tree_sitter_verilog() },
+            "c" | "h" => unsafe { svfmt::tree_sitter_c() },
+            _ => unsafe { svfmt::tree_sitter_verilog() },
         };
 
     let source = load_file(filename).unwrap();
