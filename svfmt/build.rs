@@ -5,7 +5,7 @@ fn main() {
 
 fn build_language(language: &str) {
     let package = format!("tree-sitter-{}", language);
-    let package_path = format!("../{}", package);
+    let package_path = format!("../vendor/{}", package);
     let source_directory = format!("{}/src", package_path);
     let source_file = format!("{}/parser.c", source_directory);
 
