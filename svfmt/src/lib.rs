@@ -51,15 +51,18 @@ impl<'a> Formatter<'a> {
         loop {
             let node = cursor.node();
             write!(f, "{:indent$}", "", indent = indent).unwrap();
-            let first_line = self.text(node).lines().next().unwrap_or("MISSING");
-            writeln!(
-                f,
-                "{}:{}: {}",
-                node.kind(),
-                cursor.field_name().unwrap_or("null"),
-                first_line
-            )
-            .unwrap();
+            if node.is_named() {
+                write!(f, "{}", node.kind()).unwrap();
+            } else {
+                write!(f, "anonymous").unwrap();
+            }
+            if let Some(field_name) = cursor.field_name() {
+                write!(f, "({})", field_name).unwrap();
+            }
+            if node.child_count() == 0 {
+                write!(f, ": {}", self.text(node)).unwrap();
+            }
+            writeln!(f).unwrap();
 
             if cursor.goto_first_child() {
                 indent += 4;
