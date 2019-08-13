@@ -10,13 +10,13 @@ mod expressions {
     fn binary() {
         let input = indoc!(
             "
-            function f ( int a , int b ) ;
+            function int  f ( int a , int b ) ;
                 return(a+b);
             endfunction"
         );
         let expected = indoc!(
             "
-            function f(
+            function int f(
                 int a,
                 int b
             );

@@ -197,7 +197,7 @@ impl<'a> Formatter<'a> {
 
         for child in body.children() {
             match child.kind() {
-                "function_data_type_or_implicit" => self.format_terminals(f, child, " ", " "),
+                "function_data_type_or_implicit1" => self.format_terminals(f, child, " ", " "),
                 "function_identifier" => self.format_terminals(f, child, " ", ""),
                 "tf_port_list" => self.format_tf_port_list(f, child),
                 "function_statement_or_null" => {
