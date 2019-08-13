@@ -85,6 +85,9 @@ install:
   - sh ci/install.sh
   - source ~/.cargo/env || true
 
+before_script:
+  - cd vendor/tree-sitter-verilog && npm install
+
 script:
   - bash ci/script.sh
 
