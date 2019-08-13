@@ -34,8 +34,8 @@ install:
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
   - rustc -Vv
   - cargo -V
+  - git submodule update --init
 
-# TODO This is the "test phase", tweak it as you see fit
 test_script:
   - cd vendor/tree-sitter-verilog && npm install
   # we don't run the "test phase" when doing deploys
