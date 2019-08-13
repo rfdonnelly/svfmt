@@ -6,18 +6,33 @@ set -ex
 main() {
     (cd vendor/tree-sitter-verilog && npm install)
 
-    cross build --target $TARGET
-    cross build --target $TARGET --release
+    local APP="cross"
+    local ARGS="--target $TARGET"
+
+    case $TARGET in
+        # FIXME Build on host until https://github.com/rfdonnelly/svfmt/issues/1 is resolved
+        x86_64-unknown-linux-gnu)
+            APP=cargo
+            ARGS=
+            ;;
+        *)
+            APP="cross"
+            ARGS="--target $TARGET"
+            ;;
+    esac
+
+    $APP build $ARGS
+    $APP build $ARGS --release
 
     if [ ! -z $DISABLE_TESTS ]; then
         return
     fi
 
-    cross test --target $TARGET --all
-    cross test --target $TARGET --all --release
+    $APP test $ARGS --all
+    $APP test $ARGS --all --release
 
-    # cross run --target $TARGET
-    # cross run --target $TARGET --release
+    # $APP run $ARGS
+    # $APP run $ARGS --release
 }
 
 # we don't run the "test phase" when doing deploys
