@@ -5,7 +5,7 @@ pub fn transform(source: &str) -> String {
     let tree = parse(unsafe { tree_sitter_verilog() }, source);
 
     let mut s = Vec::new();
-    format(&mut s, source, tree);
+    format(&mut s, source, &tree);
 
     String::from_utf8_lossy(&s).to_string()
 }
