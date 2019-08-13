@@ -4,6 +4,8 @@ set -ex
 
 # This is the "test phase", tweak it as you see fit
 main() {
+    (cd vendor/tree-sitter-verilog && npm install)
+
     cross build --target $TARGET
     cross build --target $TARGET --release
 

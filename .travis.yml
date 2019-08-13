@@ -80,13 +80,12 @@ matrix:
 before_install:
   - set -e
   - rustup self update
+  - nvm install 10
+  - nvm use 10
 
 install:
   - sh ci/install.sh
   - source ~/.cargo/env || true
-
-before_script:
-  - cd vendor/tree-sitter-verilog && npm install
 
 script:
   - bash ci/script.sh
