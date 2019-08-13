@@ -2,6 +2,7 @@
 # https://github.com/japaric/trust/tree/v0.1.2
 
 environment:
+  nodejs_version: "10"
   global:
     RUST_VERSION: stable
     CRATE_NAME: svfmt
@@ -36,6 +37,7 @@ install:
 
 # TODO This is the "test phase", tweak it as you see fit
 test_script:
+  - cd vendor/tree-sitter-verilog && npm install
   # we don't run the "test phase" when doing deploys
   - if [%APPVEYOR_REPO_TAG%]==[false] (
       cargo build --target %TARGET% &&
