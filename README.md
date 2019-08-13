@@ -1,4 +1,4 @@
-# svfmt ![Stability: Experimental](http://badges.github.io/stability-badges/dist/experimental.svg)
+# svfmt ![Stability: Experimental](http://badges.github.io/stability-badges/dist/experimental.svg) [![Build Status](https://travis-ci.org/rfdonnelly/svfmt.svg?branch=master)](https://travis-ci.org/rfdonnelly/svfmt)
 
 A tool for formatting Verilog/SystemVerilog code.
 
