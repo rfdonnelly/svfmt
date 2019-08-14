@@ -1,3 +1,5 @@
+use std::io;
+
 use tree_sitter::{Language, Node, Parser, Tree, TreeCursor};
 
 extern "C" {
@@ -6,8 +8,6 @@ extern "C" {
 extern "C" {
     pub fn tree_sitter_verilog() -> Language;
 }
-
-use std::io;
 
 pub fn parse<'a>(language: Language, source: &'a str) -> Tree {
     let mut parser = Parser::new();
