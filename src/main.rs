@@ -1,24 +1,20 @@
 use std::env;
+use std::ffi::OsStr;
+use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::path::Path;
-use std::ffi::OsStr;
-use std::fs::File;
-use svfmt::{self, parse, format};
+use svfmt::{self, format, parse};
 
 fn main() {
     let filename = env::args().skip(1).next().unwrap();
     let filename = Path::new(&filename);
-    let extension = filename
-        .extension()
-        .and_then(OsStr::to_str)
-        .unwrap();
+    let extension = filename.extension().and_then(OsStr::to_str).unwrap();
 
-    let language =
-        match extension {
-            "c" | "h" => unsafe { svfmt::tree_sitter_c() },
-            _ => unsafe { svfmt::tree_sitter_verilog() },
-        };
+    let language = match extension {
+        "c" | "h" => unsafe { svfmt::tree_sitter_c() },
+        _ => unsafe { svfmt::tree_sitter_verilog() },
+    };
 
     let source = load_file(filename).unwrap();
     let tree = parse(language, &source);
