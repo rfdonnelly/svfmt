@@ -1,4 +1,5 @@
-# svfmt ![Stability: Experimental](http://badges.github.io/stability-badges/dist/experimental.svg) [![Build Status](https://travis-ci.org/rfdonnelly/svfmt.svg?branch=master)](https://travis-ci.org/rfdonnelly/svfmt)
+# svfmt ![Stability: Experimental](http://badges.github.io/stability-badges/dist/experimental.svg) [![Build Status](https://travis-ci.org/rfdonnelly/svfmt.svg?branch=master)](https://travis-ci.org/rfdonnelly/svfmt) [![Build status](https://ci.appveyor.com/api/projects/status/qsh4smiij4uklx7d?svg=true)](https://ci.appveyor.com/project/rfdonnelly/svfmt)
+
 
 A tool for formatting Verilog/SystemVerilog code.
 
