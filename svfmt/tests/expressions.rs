@@ -24,6 +24,6 @@ mod expressions {
             endfunction\n\n\n"
         ); // FIXME remove trailing blank lines
 
-        assert_eq!(&transform(input), expected);
+        assert_eq!(&transform(input).unwrap(), expected);
     }
 }

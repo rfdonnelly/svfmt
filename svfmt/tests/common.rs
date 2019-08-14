@@ -1,13 +1,14 @@
 use std::fmt;
+use std::io;
 use svfmt::*;
 
-pub fn transform(source: &str) -> String {
+pub fn transform(source: &str) -> io::Result<String> {
     let tree = parse(unsafe { tree_sitter_verilog() }, source);
 
     let mut s = Vec::new();
-    format(&mut s, source, &tree);
+    format(&mut s, source, &tree)?;
 
-    String::from_utf8_lossy(&s).to_string()
+    Ok(String::from_utf8_lossy(&s).to_string())
 }
 
 /// Wrapper around string slice that makes debug output `{:?}` to print string same way as `{}`.
