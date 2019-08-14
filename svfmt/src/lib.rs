@@ -267,23 +267,34 @@ impl<'a> Formatter<'a> {
     where
         T: io::Write,
     {
-        writeln!(f, "(")?;
-
         let children = node
             .children()
             .filter(|child| child.is_named())
-            .identify_last();
+            .map(|child| {
+                let mut s = Vec::new();
+                self.format_node(&mut s, child)?;
+                Ok(String::from_utf8_lossy(&s).into_owned())
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-        for (last, child) in children {
-            self.write_spaces(f, 4)?;
-            self.format_node(f, child)?;
+        let single_line = children.join(", ");
 
-            if !last {
-                writeln!(f, ",")?;
+        if single_line.len() < 55 {
+            writeln!(f, "({});", single_line)?;
+        } else {
+            writeln!(f, "(")?;
+            for (last, child) in children.iter().identify_last() {
+                self.write_spaces(f, 4)?;
+                write!(f, "{}", child)?;
+                if last {
+                    writeln!(f)?;
+                } else {
+                    writeln!(f, ",")?;
+                }
             }
+            writeln!(f, ");")?;
         }
 
-        writeln!(f, "\n);")?;
         Ok(())
     }
 
