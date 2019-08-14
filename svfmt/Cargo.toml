@@ -13,3 +13,4 @@ pretty_assertions = "0.6"
 
 [dependencies]
 tree-sitter = "0.3"
+snafu = "0.4"

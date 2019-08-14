@@ -15,3 +15,4 @@ path = "src/main.rs"
 
 [dependencies]
 svfmt = { path = "svfmt" }
+snafu = "0.4"

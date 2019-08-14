@@ -1,7 +1,35 @@
-use std::fmt;
 use std::io;
 
+use snafu::{ensure, Backtrace, Snafu};
 use tree_sitter::{Language, Node, Parser, Tree, TreeCursor};
+
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("Could not write output"))]
+    IoError { source: io::Error },
+    #[snafu(display("Could not set source language. {}", message))]
+    LanguageError { message: String },
+    #[snafu(display("Unexpected syntax tree.  Node does not contain expected child."))]
+    TreeError { backtrace: Backtrace },
+    #[snafu(display("Unexpected syntax tree.  Invalid node child count."))]
+    InvalidCount { backtrace: Backtrace },
+    #[snafu(display("Unexpected syntax tree.  Invalid node kind."))]
+    InvalidKind { backtrace: Backtrace },
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+impl From<io::Error> for Error {
+    fn from(source: io::Error) -> Self {
+        Error::IoError { source }
+    }
+}
+
+impl From<String> for Error {
+    fn from(message: String) -> Self {
+        Error::LanguageError { message }
+    }
+}
 
 extern "C" {
     pub fn tree_sitter_c() -> Language;
@@ -10,50 +38,40 @@ extern "C" {
     pub fn tree_sitter_verilog() -> Language;
 }
 
-pub fn parse<'a>(language: Language, source: &'a str) -> Tree {
+pub fn parse<'a>(language: Language, source: &'a str) -> Result<Tree> {
     let mut parser = Parser::new();
-    parser.set_language(language).unwrap();
-    parser.parse(&source, None).unwrap()
+    parser.set_language(language)?;
+    Ok(parser.parse(&source, None).unwrap())
 }
 
-pub fn format<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> io::Result<()>
+pub fn format<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> Result<()>
 where
     T: io::Write,
 {
-    let formatter = Formatter::new(&source, tree);
-    write!(f, "{}", formatter)
+    Formatter::new(&source).format_node(f, tree.root_node())
 }
 
-pub fn debug<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> io::Result<()>
+pub fn debug<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> Result<()>
 where
     T: io::Write,
 {
     writeln!(f, "{}", tree.root_node().to_sexp())?;
     writeln!(f)?;
-    let formatter = Formatter::new(&source, tree);
-    formatter.debug_walk(f, 0, &mut tree.walk())
+    Formatter::new(&source).debug_walk(f, 0, &mut tree.walk())
 }
 
 struct Formatter<'a> {
     source: &'a [u8],
-    tree: &'a Tree,
-}
-
-impl<'a> fmt::Display for Formatter<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format_node(f, self.tree.root_node())
-    }
 }
 
 impl<'a> Formatter<'a> {
-    fn new(source: &'a str, tree: &'a Tree) -> Self {
+    fn new(source: &'a str) -> Self {
         Self {
             source: source.as_bytes(),
-            tree,
         }
     }
 
-    fn debug_walk<T>(&self, f: &mut T, mut indent: usize, cursor: &mut TreeCursor<'a>) -> io::Result<()>
+    fn debug_walk<T>(&self, f: &mut T, mut indent: usize, cursor: &mut TreeCursor<'a>) -> Result<()>
     where
         T: io::Write,
     {
@@ -97,25 +115,27 @@ impl<'a> Formatter<'a> {
         node.utf8_text(self.source).unwrap()
     }
 
-    fn format_with_newline<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_with_newline<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
-        writeln!(f, "{}", self.text(node))
+        writeln!(f, "{}", self.text(node))?;
+        Ok(())
     }
 
-    fn format_terminals<T>(&self, f: &mut T, node: Node<'a>, sep: &str, suffix: &str) -> fmt::Result
+    fn format_terminals<T>(&self, f: &mut T, node: Node<'a>, sep: &str, suffix: &str) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         let nodes: Vec<&'a str> = Terminals::new(node).map(|node| self.text(node)).collect();
 
-        write!(f, "{}{}", nodes.join(sep), suffix)
+        write!(f, "{}{}", nodes.join(sep), suffix)?;
+        Ok(())
     }
 
-    fn format_children<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_children<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         for child in node.children() {
             self.format_node(f, child)?;
@@ -124,24 +144,26 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_node<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_node<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         match node.kind() {
-            "function_declaration" => self.format_function_declaration(f, node),
-            "expression" => self.format_expression(f, node),
-            "jump_statement" => self.format_jump_statement(f, node),
-            "integer_atom_type" => write!(f, "{} ", self.text(node)),
-            "simple_identifier" => write!(f, "{}", self.text(node)),
-            "list_of_arguments_parent" => self.format_list_of_arguments(f, node),
-            _ => self.format_children(f, node),
+            "function_declaration" => self.format_function_declaration(f, node)?,
+            "expression" => self.format_expression(f, node)?,
+            "jump_statement" => self.format_jump_statement(f, node)?,
+            "integer_atom_type" => write!(f, "{} ", self.text(node))?,
+            "simple_identifier" => write!(f, "{}", self.text(node))?,
+            "list_of_arguments_parent" => self.format_list_of_arguments(f, node)?,
+            _ => self.format_children(f, node)?,
         }
+
+        Ok(())
     }
 
-    fn format_list_of_arguments<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_list_of_arguments<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         write!(f, "(")?;
         let children = node
@@ -156,12 +178,13 @@ impl<'a> Formatter<'a> {
                 write!(f, ", ")?;
             }
         }
-        write!(f, ")")
+        write!(f, ")")?;
+        Ok(())
     }
 
-    fn format_expression<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_expression<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         if node.child_count() == 3 {
             // Binary expression
@@ -171,17 +194,19 @@ impl<'a> Formatter<'a> {
 
             self.format_node(f, left)?;
             write!(f, " {} ", self.text(operator))?;
-            self.format_node(f, right)
+            self.format_node(f, right)?;
         } else {
-            assert_eq!(node.child_count(), 1);
+            ensure!(node.child_count() == 1, InvalidCount);
 
-            self.format_node(f, node.child(0).unwrap())
+            self.format_node(f, node.child(0).unwrap())?;
         }
+
+        Ok(())
     }
 
-    fn format_jump_statement<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_jump_statement<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         let jump_type = node.child(0).unwrap();
 
@@ -195,19 +220,19 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_function_declaration<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_function_declaration<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         let indent = 0;
 
-        assert_eq!(node.child_count(), 2);
+        ensure!(node.child_count() == 2, InvalidCount);
 
         let keyword = node.child(0).unwrap();
         let body = node.child(1).unwrap();
 
-        assert_eq!(keyword.kind(), "function");
-        assert_eq!(body.kind(), "function_body_declaration");
+        ensure!(keyword.kind() == "function", InvalidKind);
+        ensure!(body.kind() == "function_body_declaration", InvalidKind);
 
         write!(f, "function ")?;
 
@@ -225,19 +250,21 @@ impl<'a> Formatter<'a> {
         }
 
         writeln!(f, "endfunction")?;
-        writeln!(f)
+        writeln!(f)?;
+        Ok(())
     }
 
-    fn write_spaces<T>(&self, f: &mut T, spaces: usize) -> fmt::Result
+    fn write_spaces<T>(&self, f: &mut T, spaces: usize) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
-        write!(f, "{:1$}", "", spaces)
+        write!(f, "{:1$}", "", spaces)?;
+        Ok(())
     }
 
-    fn format_tf_port_list<T>(&self, f: &mut T, node: Node<'a>) -> fmt::Result
+    fn format_tf_port_list<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
         writeln!(f, "(")?;
 
@@ -255,18 +282,20 @@ impl<'a> Formatter<'a> {
             }
         }
 
-        writeln!(f, "\n);")
+        writeln!(f, "\n);")?;
+        Ok(())
     }
 
-    fn format_function_statement_or_null<T>(&self, f: &mut T, indent: usize, node: Node<'a>) -> fmt::Result
+    fn format_function_statement_or_null<T>(&self, f: &mut T, indent: usize, node: Node<'a>) -> Result<()>
     where
-        T: fmt::Write,
+        T: io::Write,
     {
-        assert_eq!(node.child_count(), 1);
+        ensure!(node.child_count() == 1, InvalidCount);
 
         self.write_spaces(f, indent)?;
         self.format_children(f, node)?;
-        writeln!(f, ";")
+        writeln!(f, ";")?;
+        Ok(())
     }
 }
 
