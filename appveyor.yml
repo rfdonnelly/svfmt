@@ -2,7 +2,6 @@
 # https://github.com/japaric/trust/tree/v0.1.2
 
 environment:
-  nodejs_version: "10"
   global:
     RUST_VERSION: stable
     CRATE_NAME: svfmt
@@ -23,6 +22,7 @@ environment:
     #   RUST_VERSION: nightly
 
 install:
+  - git submodule update --init
   - ps: >-
       If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
         $Env:PATH += ';C:\msys64\mingw64\bin'
@@ -34,7 +34,7 @@ install:
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
   - rustc -Vv
   - cargo -V
-  - git submodule update --init
+  - ps: Install-Product node 10
 
 test_script:
   - node --version
