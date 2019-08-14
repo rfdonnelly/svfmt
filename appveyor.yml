@@ -37,6 +37,7 @@ install:
   - git submodule update --init
 
 test_script:
+  - node --version
   - cd vendor/tree-sitter-verilog && npm install
   # we don't run the "test phase" when doing deploys
   - if [%APPVEYOR_REPO_TAG%]==[false] (
