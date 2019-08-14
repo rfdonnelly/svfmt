@@ -1,9 +1,8 @@
 use std::fmt;
-use std::io;
 use svfmt::*;
 
-pub fn transform(source: &str) -> io::Result<String> {
-    let tree = parse(unsafe { tree_sitter_verilog() }, source);
+pub fn transform(source: &str) -> svfmt::Result<String> {
+    let tree = parse(unsafe { tree_sitter_verilog() }, source)?;
 
     let mut s = Vec::new();
     format(&mut s, source, &tree)?;
