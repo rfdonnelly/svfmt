@@ -298,7 +298,12 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_function_statement_or_null<T>(&self, f: &mut T, indent: usize, node: Node<'a>) -> Result<()>
+    fn format_function_statement_or_null<T>(
+        &self,
+        f: &mut T,
+        indent: usize,
+        node: Node<'a>,
+    ) -> Result<()>
     where
         T: io::Write,
     {
