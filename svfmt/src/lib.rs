@@ -155,6 +155,7 @@ impl<'a> Formatter<'a> {
             "integer_atom_type" => write!(f, "{} ", self.text(node))?,
             "simple_identifier" => write!(f, "{}", self.text(node))?,
             "list_of_arguments_parent" => self.format_list_of_arguments(f, node)?,
+            "primary_literal" => write!(f, "{}", self.text(node))?,
             _ => self.format_children(f, node)?,
         }
 
