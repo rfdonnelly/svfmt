@@ -1,13 +1,11 @@
 use std::fmt;
 use svfmt::*;
 
-pub fn transform(source: &str) -> svfmt::Result<String> {
-    let tree = parse(unsafe { tree_sitter_verilog() }, source)?;
-
+pub fn transform(source: &str) -> String {
+    let tree = parse(unsafe { tree_sitter_verilog() }, source).unwrap();
     let mut s = Vec::new();
-    format(&mut s, source, &tree)?;
-
-    Ok(String::from_utf8_lossy(&s).to_string())
+    format(&mut s, source, &tree).unwrap();
+    String::from_utf8_lossy(&s).to_string()
 }
 
 /// Wrapper around string slice that makes debug output `{:?}` to print string same way as `{}`.
