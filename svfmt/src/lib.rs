@@ -123,14 +123,12 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_terminals<T>(&self, f: &mut T, node: Node<'a>, sep: &str, suffix: &str) -> Result<()>
-    where
-        T: io::Write,
+    fn format_terminals<T>(&self, node: Node<'a>, sep: &str) -> String
     {
-        let nodes: Vec<&'a str> = Terminals::new(node).map(|node| self.text(node)).collect();
-
-        write!(f, "{}{}", nodes.join(sep), suffix)?;
-        Ok(())
+        Terminals::new(node)
+            .map(|node| self.text(node))
+            .collect::<Vec<&str>>()
+            .join(sep)
     }
 
     fn format_children<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
@@ -235,13 +233,22 @@ impl<'a> Formatter<'a> {
         ensure!(keyword.kind() == "function", InvalidKind);
         ensure!(body.kind() == "function_body_declaration", InvalidKind);
 
-        write!(f, "function ")?;
+        let mut s = String::new();
+        s.push_str("function ");
 
         for child in body.children() {
             match child.kind() {
-                "function_data_type_or_implicit1" => self.format_terminals(f, child, " ", " ")?,
-                "function_identifier" => self.format_terminals(f, child, " ", "")?,
-                "tf_port_list" => self.format_tf_port_list(f, child)?,
+                "function_data_type_or_implicit1" => {
+                    s.push_str(&self.format_terminals::<String>(child, " "));
+                    s.push_str(" ");
+                }
+                "function_identifier" => {
+                    s.push_str(&self.format_terminals::<String>(child, " "));
+                }
+                "tf_port_list" => {
+                    s.push_str(&self.format_tf_port_list(child)?);
+                    writeln!(f, "{}", s)?;
+                }
                 "function_statement_or_null" => {
                     self.format_function_statement_or_null(f, indent + 4, child)?;
                 }
@@ -263,39 +270,40 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_tf_port_list<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
+    fn write_string<F>(&self, f: F, node: Node<'a>) -> Result<String>
     where
-        T: io::Write,
+        F: Fn(&Self, &mut Vec<u8>, Node<'a>) -> Result<()>,
     {
+        let mut s = Vec::new();
+        f(self, &mut s, node)?;
+        Ok(String::from_utf8_lossy(&s).into_owned())
+    }
+
+    fn format_tf_port_list(&self, node: Node<'a>) -> Result<String> {
         let children = node
             .children()
             .filter(|child| child.is_named())
-            .map(|child| {
-                let mut s = Vec::new();
-                self.format_node(&mut s, child)?;
-                Ok(String::from_utf8_lossy(&s).into_owned())
-            })
+            .map(|child| self.write_string(Self::format_node, child))
             .collect::<Result<Vec<_>>>()?;
 
-        let single_line = children.join(", ");
+        let single_line = format!("({});", children.join(", "));
 
         if single_line.len() < 55 {
-            writeln!(f, "({});", single_line)?;
+            Ok(single_line)
         } else {
-            writeln!(f, "(")?;
+            let mut s = String::new();
+            s.push_str("(\n");
             for (last, child) in children.iter().identify_last() {
-                self.write_spaces(f, 4)?;
-                write!(f, "{}", child)?;
-                if last {
-                    writeln!(f)?;
-                } else {
-                    writeln!(f, ",")?;
+                s.push_str("    ");
+                s.push_str(&format!("{}", child));
+                if !last {
+                    s.push_str(",");
                 }
+                s.push_str("\n");
             }
-            writeln!(f, ");")?;
+            s.push_str(");");
+            Ok(s)
         }
-
-        Ok(())
     }
 
     fn format_function_statement_or_null<T>(
