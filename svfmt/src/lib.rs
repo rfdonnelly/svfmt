@@ -86,12 +86,16 @@ impl Buffer {
         }
     }
 
+    /// Adds a string to the buffer one character at a time
     fn push_str(&mut self, s: &str) {
         for c in s.chars() {
             self.push(c);
         }
     }
 
+    /// Adds a character to the buffer
+    ///
+    /// Updates line_length.  Adds indentation for new non-blank lines.
     fn push(&mut self, c: char) {
         if c == '\n' {
             self.line_length = 0;
@@ -106,6 +110,7 @@ impl Buffer {
         self.content.push(c);
     }
 
+    /// Adds the current indentation level to the buffer
     fn push_indent(&mut self) {
         for _ in 0..self.indent {
             self.content.push(' ');
