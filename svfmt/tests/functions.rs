@@ -2,8 +2,8 @@
 mod common;
 
 mod functions {
-    use indoc::indoc;
     use crate::common::*;
+    use indoc::indoc;
 
     #[test]
     fn wrap_at_81() {

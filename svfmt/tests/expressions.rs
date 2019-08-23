@@ -2,8 +2,8 @@
 mod common;
 
 mod expressions {
-    use indoc::indoc;
     use crate::common::*;
+    use indoc::indoc;
 
     #[test]
     fn binary() {
