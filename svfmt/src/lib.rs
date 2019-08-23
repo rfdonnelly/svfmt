@@ -246,7 +246,7 @@ impl<'a> Formatter<'a> {
                     s.push_str(&self.format_terminals::<String>(child, " "));
                 }
                 "tf_port_list" => {
-                    s.push_str(&self.format_tf_port_list(child)?);
+                    s.push_str(&self.format_tf_port_list(s.len(), child)?);
                     writeln!(f, "{}", s)?;
                 }
                 "function_statement_or_null" => {
@@ -279,7 +279,7 @@ impl<'a> Formatter<'a> {
         Ok(String::from_utf8_lossy(&s).into_owned())
     }
 
-    fn format_tf_port_list(&self, node: Node<'a>) -> Result<String> {
+    fn format_tf_port_list(&self, start_length: usize, node: Node<'a>) -> Result<String> {
         let children = node
             .children()
             .filter(|child| child.is_named())
@@ -288,7 +288,7 @@ impl<'a> Formatter<'a> {
 
         let single_line = format!("({});", children.join(", "));
 
-        if single_line.len() < 55 {
+        if start_length + single_line.len() <= 80 {
             Ok(single_line)
         } else {
             let mut s = String::new();
