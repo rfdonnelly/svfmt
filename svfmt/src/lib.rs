@@ -68,11 +68,13 @@ where
 
 struct Buffer {
     content: String,
-    /// Current length of the current line.
+    /// The current length of the current line.
     ///
     /// As content is pushed into the buffer, the line_length is incremented for every character
     /// added.  If a newline character is seen, the line length is reset to 0.
     line_length: usize,
+    /// The current indent level in number of spaces.
+    indent: usize,
 }
 
 impl Buffer {
@@ -80,6 +82,7 @@ impl Buffer {
         Self {
             content: String::with_capacity(capacity),
             line_length: 0,
+            indent: 0,
         }
     }
 
@@ -97,6 +100,20 @@ impl Buffer {
         }
 
         self.content.push(c);
+    }
+
+    fn push_indent(&mut self) {
+        for _ in 0..self.indent {
+            self.push(' ');
+        }
+    }
+
+    fn increment_indent(&mut self) {
+        self.indent += 4;
+    }
+
+    fn decrement_indent(&mut self) {
+        self.indent -= 4;
     }
 }
 
@@ -248,8 +265,6 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_function_declaration(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
-        let indent = 0;
-
         ensure!(node.child_count() == 2, InvalidCount);
 
         let keyword = node.child(0).unwrap();
@@ -271,11 +286,13 @@ impl<'a> Formatter<'a> {
                     buffer.push_str(&self.format_terminals(child, " "));
                 }
                 "tf_port_list" => {
-                    buffer.push_str(&self.format_tf_port_list(buffer.line_length, child)?);
+                    &self.format_tf_port_list(buffer, child)?;
                     buffer.push_str("\n");
                 }
                 "function_statement_or_null" => {
-                    self.format_function_statement_or_null(buffer, indent + 4, child)?;
+                    buffer.increment_indent();
+                    self.format_function_statement_or_null(buffer, child)?;
+                    buffer.decrement_indent();
                 }
                 "comment" => {
                     buffer.push_str(self.text(child));
@@ -289,12 +306,6 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn write_spaces(&self, buffer: &mut Buffer, spaces: usize) {
-        std::iter::repeat(())
-            .take(spaces)
-            .for_each(|_| buffer.push_str(" "));
-    }
-
     fn to_line_buffer<F>(&self, f: F, node: Node<'a>) -> Result<String>
     where
         F: Fn(&Self, &mut Buffer, Node<'a>) -> Result<()>,
@@ -304,7 +315,7 @@ impl<'a> Formatter<'a> {
         Ok(b.to_string())
     }
 
-    fn format_tf_port_list(&self, start_length: usize, node: Node<'a>) -> Result<String> {
+    fn format_tf_port_list(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         let children = node
             .children()
             .filter(|child| child.is_named())
@@ -313,33 +324,34 @@ impl<'a> Formatter<'a> {
 
         let single_line = format!("({});", children.join(", "));
 
-        if start_length + single_line.len() <= 80 {
-            Ok(single_line)
+        if buffer.line_length + single_line.len() <= 80 {
+            buffer.push_str(&single_line);
         } else {
-            let mut s = String::new();
-            s.push_str("(\n");
+            buffer.push_str("(\n");
+            buffer.increment_indent();
             for (last, child) in children.iter().identify_last() {
-                s.push_str("    ");
-                s.push_str(&child);
+                buffer.push_indent();
+                buffer.push_str(&child);
                 if !last {
-                    s.push_str(",");
+                    buffer.push_str(",");
                 }
-                s.push_str("\n");
+                buffer.push_str("\n");
             }
-            s.push_str(");");
-            Ok(s)
+            buffer.decrement_indent();
+            buffer.push_str(");");
         }
+
+        Ok(())
     }
 
     fn format_function_statement_or_null(
         &self,
         buffer: &mut Buffer,
-        indent: usize,
         node: Node<'a>,
     ) -> Result<()> {
         ensure!(node.child_count() == 1, InvalidCount);
 
-        self.write_spaces(buffer, indent);
+        buffer.push_indent();
         self.format_children(buffer, node)?;
         buffer.push_str(";\n");
         Ok(())
