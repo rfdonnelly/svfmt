@@ -22,7 +22,7 @@ mod functions {
                 int long_parameter_name_b___
             );
             endfunction
-            \n\n"
+            "
         );
 
         assert_eq!(&transform(input), expected);
@@ -42,7 +42,32 @@ mod functions {
             "
             function int dont_wrap_at_80(int parameter_a, int parameter_b, int parameter_c);
             endfunction
-            \n\n"
+            "
+        );
+
+        assert_eq!(&transform(input), expected);
+    }
+
+    #[test]
+    fn blank_line_separation() {
+        init();
+
+        let input = indoc!(
+            "
+            function int f(int a);
+            endfunction
+            function int g(int a);
+            endfunction
+            "
+        );
+        let expected = indoc!(
+            "
+            function int f(int a);
+            endfunction
+
+            function int g(int a);
+            endfunction
+            "
         );
 
         assert_eq!(&transform(input), expected);

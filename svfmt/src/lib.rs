@@ -75,6 +75,13 @@ struct Buffer {
     line_length: usize,
     /// The current indent level in number of spaces.
     indent: usize,
+    /// Indicates whether a blank line needs to be inserted in current indent.
+    ///
+    /// This gets reset anytime indentation changes and anytime a blank line is automatically
+    /// inserted.  It gets set by maybe_blank_line().  Clients should call maybe_blank_line()
+    /// at the end of a block.  This allows a blank line to be inserted between blocks in a given
+    /// scope but prevents lines from being inserted before the first block and after the last block.
+    insert_blank_line: bool,
 }
 
 impl Buffer {
@@ -83,6 +90,7 @@ impl Buffer {
             content: String::with_capacity(capacity),
             line_length: 0,
             indent: 0,
+            insert_blank_line: false,
         }
     }
 
@@ -104,6 +112,10 @@ impl Buffer {
         }
 
         if c != '\n' && self.content.ends_with('\n') {
+            if self.insert_blank_line {
+                self.content.push('\n');
+                self.insert_blank_line = false;
+            }
             self.push_indent();
         }
 
@@ -119,10 +131,16 @@ impl Buffer {
 
     fn increment_indent(&mut self) {
         self.indent += 4;
+        self.insert_blank_line = false;
     }
 
     fn decrement_indent(&mut self) {
         self.indent -= 4;
+        self.insert_blank_line = false;
+    }
+
+    fn maybe_blank_line(&mut self) {
+        self.insert_blank_line = true;
     }
 }
 
@@ -311,7 +329,8 @@ impl<'a> Formatter<'a> {
             }
         }
 
-        buffer.push_str("endfunction\n\n");
+        buffer.push_str("endfunction\n");
+        buffer.maybe_blank_line();
         Ok(())
     }
 
