@@ -99,12 +99,16 @@ impl Buffer {
             self.line_length += 1;
         }
 
+        if c != '\n' && self.content.ends_with('\n') {
+            self.push_indent();
+        }
+
         self.content.push(c);
     }
 
     fn push_indent(&mut self) {
         for _ in 0..self.indent {
-            self.push(' ');
+            self.content.push(' ');
         }
     }
 
@@ -330,7 +334,6 @@ impl<'a> Formatter<'a> {
             buffer.push_str("(\n");
             buffer.increment_indent();
             for (last, child) in children.iter().identify_last() {
-                buffer.push_indent();
                 buffer.push_str(&child);
                 if !last {
                     buffer.push_str(",");
@@ -351,7 +354,6 @@ impl<'a> Formatter<'a> {
     ) -> Result<()> {
         ensure!(node.child_count() == 1, InvalidCount);
 
-        buffer.push_indent();
         self.format_children(buffer, node)?;
         buffer.push_str(";\n");
         Ok(())
