@@ -14,5 +14,6 @@ name = "svfmt"
 path = "src/main.rs"
 
 [dependencies]
+env_logger = "0.6.2"
 svfmt = { path = "svfmt" }
 snafu = "0.4"

@@ -7,6 +7,8 @@ mod expressions {
 
     #[test]
     fn binary() {
+        init();
+
         let input = indoc!(
             "
             function int  f ( int a , int b ) ;

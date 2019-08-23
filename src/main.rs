@@ -7,9 +7,12 @@ use std::path::Path;
 
 use svfmt::{self, format, parse};
 
+use env_logger;
 use snafu::ErrorCompat;
 
 fn main() {
+    env_logger::init();
+
     let filename = env::args().skip(1).next().unwrap();
     let filename = Path::new(&filename);
     let extension = filename.extension().and_then(OsStr::to_str).unwrap();

@@ -1,4 +1,6 @@
 use std::fmt;
+
+use env_logger;
 use svfmt::*;
 
 pub fn transform(source: &str) -> String {
@@ -27,4 +29,8 @@ macro_rules! assert_eq {
     ($left:expr, $right:expr) => {
         pretty_assertions::assert_eq!(PrettyString($left), PrettyString($right));
     };
+}
+
+pub fn init() {
+    let _ = env_logger::builder().is_test(true).try_init();
 }

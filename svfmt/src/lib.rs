@@ -1,5 +1,6 @@
 use std::io;
 
+use log::debug;
 use snafu::{ensure, Backtrace, Snafu};
 use tree_sitter::{Language, Node, Parser, Tree, TreeCursor};
 
@@ -48,7 +49,10 @@ pub fn format<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> Result<()>
 where
     T: io::Write,
 {
-    Formatter::new(&source).format_node(f, tree.root_node())
+    let mut s = String::new();
+    Formatter::new(&source).format_node(&mut s, tree.root_node())?;
+    write!(f, "{}", s)?;
+    Ok(())
 }
 
 pub fn debug<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> Result<()>
@@ -115,114 +119,93 @@ impl<'a> Formatter<'a> {
         node.utf8_text(self.source).unwrap()
     }
 
-    fn format_with_newline<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
-        writeln!(f, "{}", self.text(node))?;
-        Ok(())
-    }
-
-    fn format_terminals<T>(&self, node: Node<'a>, sep: &str) -> String
-    {
+    fn format_terminals(&self, node: Node<'a>, sep: &str) -> String {
         Terminals::new(node)
             .map(|node| self.text(node))
             .collect::<Vec<&str>>()
             .join(sep)
     }
 
-    fn format_children<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
+    fn format_children(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
         for child in node.children() {
-            self.format_node(f, child)?;
+            self.format_node(buffer, child)?;
         }
 
         Ok(())
     }
 
-    fn format_node<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
+    fn format_node(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+        debug!("format_node() kind:{}", node.kind());
         match node.kind() {
-            "function_declaration" => self.format_function_declaration(f, node)?,
-            "expression" => self.format_expression(f, node)?,
-            "jump_statement" => self.format_jump_statement(f, node)?,
-            "integer_atom_type" => write!(f, "{} ", self.text(node))?,
-            "simple_identifier" => write!(f, "{}", self.text(node))?,
-            "list_of_arguments_parent" => self.format_list_of_arguments(f, node)?,
-            "primary_literal" => write!(f, "{}", self.text(node))?,
-            _ => self.format_children(f, node)?,
+            "function_declaration" => self.format_function_declaration(buffer, node)?,
+            "expression" => self.format_expression(buffer, node)?,
+            "jump_statement" => self.format_jump_statement(buffer, node)?,
+            "integer_atom_type" => {
+                buffer.push_str(self.text(node));
+                buffer.push_str(" ");
+            }
+            "simple_identifier" => buffer.push_str(self.text(node)),
+            "list_of_arguments_parent" => self.format_list_of_arguments(buffer, node)?,
+            "primary_literal" => buffer.push_str(self.text(node)),
+            _ => self.format_children(buffer, node)?,
         }
 
         Ok(())
     }
 
-    fn format_list_of_arguments<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
-        write!(f, "(")?;
+    fn format_list_of_arguments(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+        buffer.push_str("(");
         let children = node
             .children()
             .filter(|node| node.is_named())
             .identify_last();
 
         for (last, child) in children {
-            self.format_node(f, child)?;
+            self.format_node(buffer, child)?;
 
             if !last {
-                write!(f, ", ")?;
+                buffer.push_str(", ");
             }
         }
-        write!(f, ")")?;
+        buffer.push_str(")");
         Ok(())
     }
 
-    fn format_expression<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
+    fn format_expression(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
         if node.child_count() == 3 {
             // Binary expression
             let left = node.child(0).unwrap();
             let operator = node.child(1).unwrap();
             let right = node.child(2).unwrap();
 
-            self.format_node(f, left)?;
-            write!(f, " {} ", self.text(operator))?;
-            self.format_node(f, right)?;
+            self.format_node(buffer, left)?;
+            buffer.push_str(" ");
+            buffer.push_str(self.text(operator));
+            buffer.push_str(" ");
+            self.format_node(buffer, right)?;
         } else {
             ensure!(node.child_count() == 1, InvalidCount);
 
-            self.format_node(f, node.child(0).unwrap())?;
+            self.format_node(buffer, node.child(0).unwrap())?;
         }
 
         Ok(())
     }
 
-    fn format_jump_statement<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
+    fn format_jump_statement(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
         let jump_type = node.child(0).unwrap();
 
-        write!(f, "{}", self.text(jump_type))?;
+        buffer.push_str(self.text(jump_type));
         if node.child_count() == 3 {
-            write!(f, " ")?;
+            buffer.push_str(" ");
             let expression = node.child(1).unwrap();
-            self.format_expression(f, expression)?;
+            self.format_expression(buffer, expression)?;
         }
 
         Ok(())
     }
 
-    fn format_function_declaration<T>(&self, f: &mut T, node: Node<'a>) -> Result<()>
-    where
-        T: io::Write,
-    {
+    fn format_function_declaration(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
         let indent = 0;
 
         ensure!(node.child_count() == 2, InvalidCount);
@@ -237,46 +220,48 @@ impl<'a> Formatter<'a> {
         s.push_str("function ");
 
         for child in body.children() {
+            debug!("format_function_declaration() child:{}", child.kind());
             match child.kind() {
                 "function_data_type_or_implicit1" => {
-                    s.push_str(&self.format_terminals::<String>(child, " "));
+                    s.push_str(&self.format_terminals(child, " "));
                     s.push_str(" ");
                 }
                 "function_identifier" => {
-                    s.push_str(&self.format_terminals::<String>(child, " "));
+                    s.push_str(&self.format_terminals(child, " "));
                 }
                 "tf_port_list" => {
-                    s.push_str(&self.format_tf_port_list(s.len(), child)?);
-                    writeln!(f, "{}", s)?;
+                    buffer.push_str(&s);
+                    buffer.push_str(&self.format_tf_port_list(s.len(), child)?);
+                    buffer.push_str("\n");
                 }
                 "function_statement_or_null" => {
-                    self.format_function_statement_or_null(f, indent + 4, child)?;
+                    self.format_function_statement_or_null(buffer, indent + 4, child)?;
                 }
-                "comment" => self.format_with_newline(f, child)?,
+                "comment" => {
+                    buffer.push_str(self.text(child));
+                    buffer.push_str("\n");
+                }
                 _ => {}
             }
         }
 
-        writeln!(f, "endfunction")?;
-        writeln!(f)?;
+        buffer.push_str("endfunction\n\n");
         Ok(())
     }
 
-    fn write_spaces<T>(&self, f: &mut T, spaces: usize) -> Result<()>
-    where
-        T: io::Write,
-    {
-        write!(f, "{:1$}", "", spaces)?;
-        Ok(())
+    fn write_spaces(&self, buffer: &mut String, spaces: usize) {
+        std::iter::repeat(())
+            .take(spaces)
+            .for_each(|_| buffer.push_str(" "));
     }
 
     fn write_string<F>(&self, f: F, node: Node<'a>) -> Result<String>
     where
-        F: Fn(&Self, &mut Vec<u8>, Node<'a>) -> Result<()>,
+        F: Fn(&Self, &mut String, Node<'a>) -> Result<()>,
     {
-        let mut s = Vec::new();
+        let mut s = String::new();
         f(self, &mut s, node)?;
-        Ok(String::from_utf8_lossy(&s).into_owned())
+        Ok(s)
     }
 
     fn format_tf_port_list(&self, start_length: usize, node: Node<'a>) -> Result<String> {
@@ -295,7 +280,7 @@ impl<'a> Formatter<'a> {
             s.push_str("(\n");
             for (last, child) in children.iter().identify_last() {
                 s.push_str("    ");
-                s.push_str(&format!("{}", child));
+                s.push_str(&child);
                 if !last {
                     s.push_str(",");
                 }
@@ -306,20 +291,17 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    fn format_function_statement_or_null<T>(
+    fn format_function_statement_or_null(
         &self,
-        f: &mut T,
+        buffer: &mut String,
         indent: usize,
         node: Node<'a>,
-    ) -> Result<()>
-    where
-        T: io::Write,
-    {
+    ) -> Result<()> {
         ensure!(node.child_count() == 1, InvalidCount);
 
-        self.write_spaces(f, indent)?;
-        self.format_children(f, node)?;
-        writeln!(f, ";")?;
+        self.write_spaces(buffer, indent);
+        self.format_children(buffer, node)?;
+        buffer.push_str(";\n");
         Ok(())
     }
 }
