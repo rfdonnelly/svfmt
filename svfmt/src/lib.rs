@@ -352,11 +352,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_function_statement_or_null(
-        &self,
-        buffer: &mut Buffer,
-        node: Node<'a>,
-    ) -> Result<()> {
+    fn format_function_statement_or_null(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         ensure!(node.child_count() == 1, InvalidCount);
 
         self.format_children(buffer, node)?;
