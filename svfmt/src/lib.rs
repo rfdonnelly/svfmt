@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io;
 
 use log::debug;
@@ -49,9 +50,10 @@ pub fn format<'a, T>(f: &mut T, source: &'a str, tree: &Tree) -> Result<()>
 where
     T: io::Write,
 {
-    let mut s = String::new();
-    Formatter::new(&source).format_node(&mut s, tree.root_node())?;
-    write!(f, "{}", s)?;
+    let length = source.len() + source.len() / 2;
+    let mut b = Buffer::with_capacity(length);
+    Formatter::new(&source).format_node(&mut b, tree.root_node())?;
+    write!(f, "{}", b)?;
     Ok(())
 }
 
@@ -62,6 +64,46 @@ where
     writeln!(f, "{}", tree.root_node().to_sexp())?;
     writeln!(f)?;
     Formatter::new(&source).debug_walk(f, 0, &mut tree.walk())
+}
+
+struct Buffer {
+    content: String,
+    /// Current length of the current line.
+    ///
+    /// As content is pushed into the buffer, the line_length is incremented for every character
+    /// added.  If a newline character is seen, the line length is reset to 0.
+    line_length: usize,
+}
+
+impl Buffer {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            content: String::with_capacity(capacity),
+            line_length: 0,
+        }
+    }
+
+    fn push_str(&mut self, s: &str) {
+        for c in s.chars() {
+            self.push(c);
+        }
+    }
+
+    fn push(&mut self, c: char) {
+        if c == '\n' {
+            self.line_length = 0;
+        } else {
+            self.line_length += 1;
+        }
+
+        self.content.push(c);
+    }
+}
+
+impl fmt::Display for Buffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.content)
+    }
 }
 
 struct Formatter<'a> {
@@ -126,7 +168,7 @@ impl<'a> Formatter<'a> {
             .join(sep)
     }
 
-    fn format_children(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+    fn format_children(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         for child in node.children() {
             self.format_node(buffer, child)?;
         }
@@ -134,7 +176,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_node(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+    fn format_node(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         debug!("format_node() kind:{}", node.kind());
         match node.kind() {
             "function_declaration" => self.format_function_declaration(buffer, node)?,
@@ -153,7 +195,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_list_of_arguments(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+    fn format_list_of_arguments(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         buffer.push_str("(");
         let children = node
             .children()
@@ -171,7 +213,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_expression(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+    fn format_expression(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         if node.child_count() == 3 {
             // Binary expression
             let left = node.child(0).unwrap();
@@ -192,7 +234,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_jump_statement(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+    fn format_jump_statement(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         let jump_type = node.child(0).unwrap();
 
         buffer.push_str(self.text(jump_type));
@@ -205,7 +247,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn format_function_declaration(&self, buffer: &mut String, node: Node<'a>) -> Result<()> {
+    fn format_function_declaration(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         let indent = 0;
 
         ensure!(node.child_count() == 2, InvalidCount);
@@ -216,22 +258,20 @@ impl<'a> Formatter<'a> {
         ensure!(keyword.kind() == "function", InvalidKind);
         ensure!(body.kind() == "function_body_declaration", InvalidKind);
 
-        let mut s = String::new();
-        s.push_str("function ");
+        buffer.push_str("function ");
 
         for child in body.children() {
             debug!("format_function_declaration() child:{}", child.kind());
             match child.kind() {
                 "function_data_type_or_implicit1" => {
-                    s.push_str(&self.format_terminals(child, " "));
-                    s.push_str(" ");
+                    buffer.push_str(&self.format_terminals(child, " "));
+                    buffer.push_str(" ");
                 }
                 "function_identifier" => {
-                    s.push_str(&self.format_terminals(child, " "));
+                    buffer.push_str(&self.format_terminals(child, " "));
                 }
                 "tf_port_list" => {
-                    buffer.push_str(&s);
-                    buffer.push_str(&self.format_tf_port_list(s.len(), child)?);
+                    buffer.push_str(&self.format_tf_port_list(buffer.line_length, child)?);
                     buffer.push_str("\n");
                 }
                 "function_statement_or_null" => {
@@ -249,26 +289,26 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn write_spaces(&self, buffer: &mut String, spaces: usize) {
+    fn write_spaces(&self, buffer: &mut Buffer, spaces: usize) {
         std::iter::repeat(())
             .take(spaces)
             .for_each(|_| buffer.push_str(" "));
     }
 
-    fn write_string<F>(&self, f: F, node: Node<'a>) -> Result<String>
+    fn to_line_buffer<F>(&self, f: F, node: Node<'a>) -> Result<String>
     where
-        F: Fn(&Self, &mut String, Node<'a>) -> Result<()>,
+        F: Fn(&Self, &mut Buffer, Node<'a>) -> Result<()>,
     {
-        let mut s = String::new();
-        f(self, &mut s, node)?;
-        Ok(s)
+        let mut b = Buffer::with_capacity(1024);
+        f(self, &mut b, node)?;
+        Ok(b.to_string())
     }
 
     fn format_tf_port_list(&self, start_length: usize, node: Node<'a>) -> Result<String> {
         let children = node
             .children()
             .filter(|child| child.is_named())
-            .map(|child| self.write_string(Self::format_node, child))
+            .map(|child| self.to_line_buffer(Self::format_node, child))
             .collect::<Result<Vec<_>>>()?;
 
         let single_line = format!("({});", children.join(", "));
@@ -293,7 +333,7 @@ impl<'a> Formatter<'a> {
 
     fn format_function_statement_or_null(
         &self,
-        buffer: &mut String,
+        buffer: &mut Buffer,
         indent: usize,
         node: Node<'a>,
     ) -> Result<()> {
