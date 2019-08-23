@@ -12,7 +12,8 @@ mod functions {
         let input = indoc!(
             "
             function int wrap_at_81(int long_parameter_name_a, int long_parameter_name_b___);
-            endfunction"
+            endfunction
+            "
         );
         let expected = indoc!(
             "
@@ -20,7 +21,8 @@ mod functions {
                 int long_parameter_name_a,
                 int long_parameter_name_b___
             );
-            endfunction\n\n\n"
+            endfunction
+            \n\n"
         );
 
         assert_eq!(&transform(input), expected);
@@ -33,12 +35,14 @@ mod functions {
         let input = indoc!(
             "
             function int dont_wrap_at_80(int parameter_a, int parameter_b, int parameter_c);
-            endfunction"
+            endfunction
+            "
         );
         let expected = indoc!(
             "
             function int dont_wrap_at_80(int parameter_a, int parameter_b, int parameter_c);
-            endfunction\n\n\n"
+            endfunction
+            \n\n"
         );
 
         assert_eq!(&transform(input), expected);
