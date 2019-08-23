@@ -224,6 +224,7 @@ impl<'a> Formatter<'a> {
         debug!("format_node() kind:{}", node.kind());
         match node.kind() {
             "function_declaration" => self.format_function_declaration(buffer, node)?,
+            "class_declaration" => self.format_class_declaration(buffer, node)?,
             "expression" => self.format_expression(buffer, node)?,
             "jump_statement" => self.format_jump_statement(buffer, node)?,
             "integer_atom_type" => {
@@ -288,6 +289,31 @@ impl<'a> Formatter<'a> {
             self.format_expression(buffer, expression)?;
         }
 
+        Ok(())
+    }
+
+    fn format_class_declaration(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
+        buffer.push_str("class ");
+        for child in node.children() {
+            debug!("format_class_declaration() child:{}", child.kind());
+            match child.kind() {
+                "class_identifier" => {
+                    buffer.push_str(&self.format_terminals(child, " "));
+                }
+                ";" => {
+                    buffer.push_str(";\n");
+                    buffer.increment_indent();
+                }
+                "class_item" => {
+                    self.format_node(buffer, child)?;
+                }
+                _ => {}
+            }
+        }
+
+        buffer.decrement_indent();
+        buffer.push_str("endclass\n");
+        buffer.maybe_blank_line();
         Ok(())
     }
 
