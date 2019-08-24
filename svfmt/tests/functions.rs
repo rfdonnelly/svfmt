@@ -72,4 +72,45 @@ mod functions {
 
         assert_eq!(&transform(input), expected);
     }
+
+    #[test]
+    fn item_separation() {
+        init();
+
+        let input = indoc!(
+            "
+            function int f(a);
+
+                // Comment
+
+                a = 1;
+                a = 2;
+
+
+                // Comment
+                a = 3;
+
+                // Comment
+
+            endfunction
+            "
+        );
+        let expected = indoc!(
+            "
+            function int f(a);
+                // Comment
+
+                a = 1;
+                a = 2;
+
+                // Comment
+                a = 3;
+
+                // Comment
+            endfunction
+            "
+        );
+
+        assert_eq!(&transform(input), expected);
+    }
 }

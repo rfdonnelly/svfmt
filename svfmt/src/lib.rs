@@ -378,8 +378,13 @@ impl<'a> Formatter<'a> {
                     buffer.decrement_indent();
                 }
                 Symbol::Comment => {
+                    buffer.increment_indent();
+                    if self.blank_lines_after_previous_function_item(child) > 0 {
+                        buffer.push('\n');
+                    }
                     buffer.push_str(self.text(child));
                     buffer.push_str("\n");
+                    buffer.decrement_indent();
                 }
                 _ => {}
             }
@@ -430,9 +435,31 @@ impl<'a> Formatter<'a> {
     fn format_function_statement_or_null(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         ensure!(node.child_count() == 1, InvalidCount);
 
+        if self.blank_lines_after_previous_function_item(node) > 0 {
+            buffer.push('\n');
+        }
+
         self.format_children(buffer, node)?;
         buffer.push_str(";\n");
         Ok(())
+    }
+
+    fn blank_lines_after_previous_function_item(&self, node: Node<'a>) -> usize {
+        let prev = node.prev_sibling();
+
+        if let Some(prev) = prev {
+            // Need to check the previous symbol type because the grammar mixes function items with
+            // function head items.
+            match Symbol::from(prev.kind_id()) {
+                Symbol::FunctionStatementOrNull
+                | Symbol::Comment => {
+                    node.start_position().row - prev.end_position().row - 1
+                }
+                _ => 0,
+            }
+        } else {
+            0
+        }
     }
 }
 
