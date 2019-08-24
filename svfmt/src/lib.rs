@@ -236,6 +236,7 @@ impl<'a> Formatter<'a> {
             Symbol::ClassDeclaration => self.format_class_declaration(buffer, node)?,
             Symbol::Expression => self.format_expression(buffer, node)?,
             Symbol::JumpStatement => self.format_jump_statement(buffer, node)?,
+            Symbol::OperatorAssignment => self.format_operator_assignment(buffer, node)?,
             Symbol::IntegerAtomType => {
                 buffer.push_str(self.text(node));
                 buffer.push_str(" ");
@@ -297,6 +298,22 @@ impl<'a> Formatter<'a> {
             let expression = node.child(1).unwrap();
             self.format_expression(buffer, expression)?;
         }
+
+        Ok(())
+    }
+
+    fn format_operator_assignment(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
+        ensure!(node.child_count() == 3, InvalidCount);
+
+        let lvalue = node.child(0).unwrap();
+        let assignment_operator = node.child(1).unwrap();
+        let expression = node.child(2).unwrap();
+
+        buffer.push_str(self.text(lvalue));
+        buffer.push(' ');
+        buffer.push_str(self.text(assignment_operator));
+        buffer.push(' ');
+        self.format_expression(buffer, expression)?;
 
         Ok(())
     }
