@@ -57,6 +57,7 @@ fn parse_symbols(path: PathBuf) -> io::Result<Vec<Symbol>> {
 fn write_symbols_enum(symbols: &[Symbol], path: PathBuf) -> io::Result<()> {
     let mut f = File::create(path)?;
 
+    writeln!(f, "#[derive(Debug, PartialEq)]")?;
     writeln!(f, "enum Symbol {{")?;
     writeln!(f, "    Undefined,")?;
     for symbol in symbols {
