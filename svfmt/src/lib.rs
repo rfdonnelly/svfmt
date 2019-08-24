@@ -5,6 +5,8 @@ use log::debug;
 use snafu::{ensure, Backtrace, Snafu};
 use tree_sitter::{Language, Node, Parser, Tree, TreeCursor};
 
+include!(concat!(env!("OUT_DIR"), "/symbols.rs"));
+
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("Could not write output"))]
@@ -229,18 +231,18 @@ impl<'a> Formatter<'a> {
 
     fn format_node(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
         debug!("format_node() kind:{}", node.kind());
-        match node.kind() {
-            "function_declaration" => self.format_function_declaration(buffer, node)?,
-            "class_declaration" => self.format_class_declaration(buffer, node)?,
-            "expression" => self.format_expression(buffer, node)?,
-            "jump_statement" => self.format_jump_statement(buffer, node)?,
-            "integer_atom_type" => {
+        match Symbol::from(node.kind_id()) {
+            Symbol::FunctionDeclaration => self.format_function_declaration(buffer, node)?,
+            Symbol::ClassDeclaration => self.format_class_declaration(buffer, node)?,
+            Symbol::Expression => self.format_expression(buffer, node)?,
+            Symbol::JumpStatement => self.format_jump_statement(buffer, node)?,
+            Symbol::IntegerAtomType => {
                 buffer.push_str(self.text(node));
                 buffer.push_str(" ");
             }
-            "simple_identifier" => buffer.push_str(self.text(node)),
-            "list_of_arguments_parent" => self.format_list_of_arguments(buffer, node)?,
-            "primary_literal" => buffer.push_str(self.text(node)),
+            Symbol::SimpleIdentifier => buffer.push_str(self.text(node)),
+            Symbol::ListOfArgumentsParent => self.format_list_of_arguments(buffer, node)?,
+            Symbol::PrimaryLiteral => buffer.push_str(self.text(node)),
             _ => self.format_children(buffer, node)?,
         }
 
@@ -331,30 +333,30 @@ impl<'a> Formatter<'a> {
         let body = node.child(1).unwrap();
 
         ensure!(keyword.kind() == "function", InvalidKind);
-        ensure!(body.kind() == "function_body_declaration", InvalidKind);
+        ensure!(Symbol::from(body.kind_id()) == Symbol::FunctionBodyDeclaration, InvalidKind);
 
         buffer.push_str("function ");
 
         for child in body.children() {
             debug!("format_function_declaration() child:{}", child.kind());
-            match child.kind() {
-                "function_data_type_or_implicit1" => {
+            match Symbol::from(child.kind_id()) {
+                Symbol::FunctionDataTypeOrImplicit1 => {
                     buffer.push_str(&self.format_terminals(child, " "));
                     buffer.push_str(" ");
                 }
-                "function_identifier" => {
+                Symbol::FunctionIdentifier => {
                     buffer.push_str(&self.format_terminals(child, " "));
                 }
-                "tf_port_list" => {
+                Symbol::TfPortList => {
                     &self.format_tf_port_list(buffer, child)?;
                     buffer.push_str("\n");
                 }
-                "function_statement_or_null" => {
+                Symbol::FunctionStatementOrNull => {
                     buffer.increment_indent();
                     self.format_function_statement_or_null(buffer, child)?;
                     buffer.decrement_indent();
                 }
-                "comment" => {
+                Symbol::Comment => {
                     buffer.push_str(self.text(child));
                     buffer.push_str("\n");
                 }
