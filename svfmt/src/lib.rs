@@ -319,18 +319,22 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_class_declaration(&self, buffer: &mut Buffer, node: Node<'a>) -> Result<()> {
+        let mut class_item_seen = false;
+
         buffer.push_str("class ");
         for child in node.children() {
             debug!("format_class_declaration() child:{}", child.kind());
-            match child.kind() {
-                "class_identifier" => {
+            match Symbol::from(child.kind_id()) {
+                Symbol::ClassIdentifier => {
                     buffer.push_str(&self.format_terminals(child, " "));
                 }
-                ";" => {
-                    buffer.push_str(";\n");
-                    buffer.increment_indent();
-                }
-                "class_item" => {
+                Symbol::ClassItem => {
+                    if !class_item_seen {
+                        buffer.push_str(";\n");
+                        buffer.increment_indent();
+                        class_item_seen = true;
+                    }
+
                     self.format_node(buffer, child)?;
                 }
                 _ => {}

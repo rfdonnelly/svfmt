@@ -40,18 +40,35 @@ fn parse_symbols(path: PathBuf) -> io::Result<Vec<Symbol>> {
 
     for line in reader.lines() {
         if let Ok(line) = line {
-            if line.starts_with("  sym_") && !line.starts_with("  sym__") {
-                let tokens = line.split(|c| char::is_whitespace(c) || c == '=' || c == ',')
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<&str>>();
-                let (name, id) = (tokens[0], tokens[1].to_string());
-                let name = name.split('_').skip(1).map(titlecase).collect::<Vec<String>>().join("");
-                symbols.push(Symbol { name, id });
-            }
+            add_symbol_if_starts_with(&line, "sym_", &mut symbols);
+            add_symbol_if_starts_with(&line, "alias_sym_", &mut symbols);
         }
     }
 
     Ok(symbols)
+}
+
+fn add_symbol_if_starts_with(line: &str, starts_with: &str, symbols: &mut Vec<Symbol>) {
+    // Ignore hidden symbols
+    //
+    // Hidden symbols begin with a '_'.
+    let not_starts_with = format!("{}_", starts_with);
+
+    let line = line.trim_start();
+
+    if line.starts_with(starts_with) && !line.starts_with(&not_starts_with) {
+        let tokens = line.split(|c| char::is_whitespace(c) || c == '=' || c == ',')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>();
+        let (name, id) = (tokens[0], tokens[1].to_string());
+        let name = name
+            .get(starts_with.len()..)
+            .unwrap().split('_')
+            .map(titlecase)
+            .collect::<Vec<String>>()
+            .join("");
+        symbols.push(Symbol { name, id });
+    }
 }
 
 fn write_symbols_enum(symbols: &[Symbol], path: PathBuf) -> io::Result<()> {
