@@ -67,14 +67,21 @@ where
 }
 
 struct Buffer {
+    /// Holds the current content of the buffer.
+    ///
+    /// Clients use `push_str()` and `push()` to add content to the buffer.  Clients obtain the
+    /// content of the buffer via its Display implementation.
     content: String,
+
     /// The current length of the current line.
     ///
     /// As content is pushed into the buffer, the line_length is incremented for every character
     /// added.  If a newline character is seen, the line length is reset to 0.
     line_length: usize,
+
     /// The current indent level in number of spaces.
     indent: usize,
+
     /// Indicates whether a blank line needs to be inserted in current indent.
     ///
     /// This gets reset anytime indentation changes and anytime a blank line is automatically
