@@ -453,7 +453,13 @@ impl<'a> Formatter<'a> {
             match Symbol::from(prev.kind_id()) {
                 Symbol::FunctionStatementOrNull
                 | Symbol::Comment => {
-                    node.start_position().row - prev.end_position().row - 1
+                    let difference = node.start_position().row - prev.end_position().row;
+
+                    if difference == 0 {
+                        0
+                    } else {
+                        difference - 1
+                    }
                 }
                 _ => 0,
             }
