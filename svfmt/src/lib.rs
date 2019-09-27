@@ -186,7 +186,7 @@ impl<'a> Formatter<'a> {
                 write!(f, "({})", field_name)?;
             }
             if node.child_count() == 0 {
-                write!(f, ": {}", self.text(node))?;
+                write!(f, ": '{}'", self.text(node))?;
             }
             writeln!(f)?;
 
